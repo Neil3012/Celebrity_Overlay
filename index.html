@@ -49,40 +49,36 @@
         }
 
         async function startFilter() {
-            const net = await bodyPix.load();
-            const video = await setupCamera();
-            const canvas = document.getElementById("output");
-            const ctx = canvas.getContext("2d");
+    const net = await bodyPix.load();
+    const video = await setupCamera();
+    const canvas = document.getElementById("output");
+    const ctx = canvas.getContext("2d");
 
-            // Set canvas dimensions to match video
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+    async function renderFrame() {
+        const segmentation = await net.segmentPerson(video);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            const background = new Image();
-            background.src = "background.jpg"; // Ensure this image exists
-            background.onload = () => {
-                renderFrame();
-            };
-
-            async function renderFrame() {
-                const segmentation = await net.segmentPerson(video);
-
-                ctx.drawImage(background, 0, 0, canvas.width, canvas.height); // Draw background
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Draw video feed
-
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const pixels = imageData.data;
-
-                for (let i = 0; i < pixels.length; i += 4) {
-                    if (segmentation.data[i / 4] === 0) {
-                        pixels[i + 3] = 0; // Make background transparent
-                    }
-                }
-
-                ctx.putImageData(imageData, 0, 0);
-                requestAnimationFrame(renderFrame);
+        // Apply segmentation (make background transparent)
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+        for (let i = 0; i < pixels.length; i += 4) {
+            if (segmentation.data[i / 4] === 0) {
+                pixels[i + 3] = 0; // Make background transparent
             }
         }
+        ctx.putImageData(imageData, 0, 0);
+
+        // Draw Text on top
+        ctx.font = "20px Arial";
+        ctx.fillStyle = "red";
+        ctx.fillText("Live Camera Feed", 20, 40);
+
+        requestAnimationFrame(renderFrame);
+    }
+
+    renderFrame();
+}
+
 
         startFilter();
     </script>
