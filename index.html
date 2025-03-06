@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Segmentation - AI Background Removal</title>
+    <title>Video Background with Real-Time Segmentation</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
     <style>
         body {
@@ -45,53 +45,60 @@
     </div>
 
     <script>
-        const video = document.getElementById("bgVideo");
+        const bgVideo = document.getElementById("bgVideo");
         const cameraFeed = document.getElementById("cameraFeed");
         const canvas = document.getElementById("outputCanvas");
         const ctx = canvas.getContext("2d");
 
-        // Initialize MediaPipe Selfie Segmentation
-        const selfieSegmentation = new SelfieSegmentation({ locateFile: (file) =>
-            `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
-        });
+        // ✅ Fix: Use async loading to prevent freezing
+        async function startSegmentation() {
+            const selfieSegmentation = new SelfieSegmentation({ locateFile: (file) =>
+                `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+            });
 
-        selfieSegmentation.setOptions({
-            modelSelection: 1, // Higher accuracy model
-            selfieMode: true
-        });
+            selfieSegmentation.setOptions({
+                modelSelection: 1, // Higher accuracy model
+                selfieMode: true
+            });
 
-        selfieSegmentation.onResults(results => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            await selfieSegmentation.initialize(); // Ensure model loads fully
 
-            // Draw Background Video First
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // ✅ Fix: Process Frames at a Lower Interval (Avoid Freezing)
+            async function processFrame() {
+                if (cameraFeed.readyState >= 2) {
+                    const results = await selfieSegmentation.send({ image: cameraFeed });
 
-            // Apply AI Mask (Keep only the Real Person)
-            ctx.globalCompositeOperation = "destination-in";
-            ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
 
-            // Draw Camera Feed (Only the Person Appears)
-            ctx.globalCompositeOperation = "destination-over";
-            ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+                    // Draw Background Video First
+                    ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
 
-            // Reset Canvas Blending Mode
-            ctx.globalCompositeOperation = "source-over";
-        });
+                    // Apply AI Mask (Keep only the Real Person)
+                    ctx.globalCompositeOperation = "destination-in";
+                    ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
 
-        // Access Camera
+                    // Draw Camera Feed (Only the Person Appears)
+                    ctx.globalCompositeOperation = "destination-over";
+                    ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+
+                    // Reset Canvas Blending Mode
+                    ctx.globalCompositeOperation = "source-over";
+                }
+
+                setTimeout(processFrame, 40); // ✅ Fix: Lower Frame Rate to Prevent Freezing
+            }
+
+            processFrame();
+        }
+
+        // ✅ Fix: Ensure Camera Permissions Work on Mobile
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
-
-                // Process Camera Feed with AI
-                function processFrame() {
-                    selfieSegmentation.send({ image: cameraFeed });
-                    requestAnimationFrame(processFrame);
-                }
-                processFrame();
+                startSegmentation(); // Start AI Processing after camera starts
             } catch (error) {
                 console.error("Error accessing camera:", error);
             }
