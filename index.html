@@ -3,17 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Celebrity Video Foreground Overlay</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Celebrity Video Overlay</title>
 </head>
 <body>
-    <!-- Background Video -->
-    <video id="bgVideo" src="Option 2.mp4" autoplay loop muted></video>
-
-    <!-- Canvas for Processing -->
+    <video id="bgVideo" src="celebrity.mp4" loop muted></video>
     <canvas id="outputCanvas"></canvas>
-
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
+    <button id="startButton">Start Experience</button>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

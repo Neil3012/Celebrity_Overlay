@@ -1,5 +1,5 @@
 const videoElement = document.createElement("video");
-videoElement.setAttribute("playsinline", ""); // Prevent fullscreen on mobile
+videoElement.setAttribute("playsinline", ""); // Prevents fullscreen on mobile
 videoElement.width = 640;
 videoElement.height = 480;
 
@@ -30,6 +30,9 @@ async function startCamera() {
         });
         videoElement.srcObject = stream;
         await videoElement.play();
+        
+        // Start processing only after both video & camera are ready
+        bgVideo.play();
         processVideoFrame();
     } catch (err) {
         console.error("Camera access error:", err);
@@ -49,14 +52,16 @@ function processResults(results) {
     ctx.globalCompositeOperation = "source-over";
     ctx.drawImage(bgVideo, 0, 0, outputCanvas.width, outputCanvas.height);
 
-    // Draw the mask for the user
+    // Draw the user segmentation mask (to remove background)
     ctx.globalCompositeOperation = "destination-out";
     ctx.drawImage(results.segmentationMask, 0, 0, outputCanvas.width, outputCanvas.height);
 
-    // Draw the user on top (without background)
+    // Draw the user (foreground) on top
     ctx.globalCompositeOperation = "source-atop";
     ctx.drawImage(videoElement, 0, 0, outputCanvas.width, outputCanvas.height);
 }
 
-// Start the app
-startCamera();
+// Wait for user to click 'Start' before running camera & video
+document.getElementById("startButton").addEventListener("click", () => {
+    startCamera();
+});
