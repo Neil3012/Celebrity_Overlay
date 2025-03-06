@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Step 1: Load Background Video & Camera Feed</title>
+    <title>Step 1: Fix Background Video & Camera Drawing</title>
     <style>
         body {
             margin: 0;
@@ -21,7 +21,7 @@
             overflow: hidden;
         }
 
-        video, canvas {
+        canvas {
             position: absolute;
             width: 100%;
             height: 100%;
@@ -31,49 +31,55 @@
 </head>
 <body>
     <div id="videoContainer">
-        <!-- Background Video -->
-        <video id="bgVideo" autoplay loop muted playsinline>
-            <source src="Option 2.mp4" type="video/mp4">
-        </video>
-
-        <!-- Camera Feed (Visible) -->
-        <video id="cameraFeed" autoplay playsinline></video>
-
-        <!-- Canvas to Combine Background & Camera -->
+        <!-- Canvas to Combine Background Video & Camera Feed -->
         <canvas id="outputCanvas"></canvas>
     </div>
 
     <script>
-        const bgVideo = document.getElementById("bgVideo");
-        const cameraFeed = document.getElementById("cameraFeed");
         const canvas = document.getElementById("outputCanvas");
         const ctx = canvas.getContext("2d");
 
-        // ✅ Ensure Camera Starts Properly
+        const bgVideo = document.createElement("video");
+        bgVideo.src = "Option 2.MP4";
+        bgVideo.loop = true;
+        bgVideo.muted = true;
+        bgVideo.autoplay = true;
+        bgVideo.playsInline = true;
+
+        const cameraFeed = document.createElement("video");
+        cameraFeed.autoplay = true;
+        cameraFeed.playsInline = true;
+
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
 
-                // Start drawing on canvas
-                function updateCanvas() {
-                    canvas.width = window.innerWidth;
-                    canvas.height = window.innerHeight;
-
-                    // Draw Background Video
-                    ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
-
-                    // Draw Camera Feed
-                    ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
-
-                    requestAnimationFrame(updateCanvas);
-                }
-
-                updateCanvas(); // Start canvas rendering loop
+                updateCanvas(); // Start drawing
             } catch (error) {
                 console.error("Error accessing camera:", error);
             }
+        }
+
+        function updateCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // Clear previous frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // ✅ Step 1: Draw Background Video First
+            if (!bgVideo.paused) {
+                ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
+            }
+
+            // ✅ Step 2: Draw Camera Feed on Top
+            if (cameraFeed.readyState >= 2) {
+                ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+            }
+
+            requestAnimationFrame(updateCanvas);
         }
 
         startCamera();
