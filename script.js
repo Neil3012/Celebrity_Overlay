@@ -1,12 +1,13 @@
 const videoElement = document.createElement("video");
-videoElement.setAttribute("playsinline", ""); // Prevents fullscreen pop-up on iOS
+videoElement.setAttribute("playsinline", ""); // Prevent fullscreen on mobile
 videoElement.width = 640;
 videoElement.height = 480;
 
+const bgVideo = document.getElementById("bgVideo"); // Celebrity video
 const outputCanvas = document.getElementById("outputCanvas");
 const ctx = outputCanvas.getContext("2d");
 
-// Set canvas to match the screen size
+// Match canvas size with the window
 outputCanvas.width = window.innerWidth;
 outputCanvas.height = window.innerHeight;
 
@@ -22,7 +23,7 @@ async function startCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
-                facingMode: "environment", // Opens the back camera
+                facingMode: "environment", // Back camera
                 width: { ideal: 640 },
                 height: { ideal: 480 }
             }
@@ -44,20 +45,17 @@ async function processVideoFrame() {
 function processResults(results) {
     ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
 
-    // Flip the video horizontally (mirror effect)
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.translate(-outputCanvas.width, 0);
-
-    // Draw the segmentation mask
+    // Draw the celebrity background video
     ctx.globalCompositeOperation = "source-over";
+    ctx.drawImage(bgVideo, 0, 0, outputCanvas.width, outputCanvas.height);
+
+    // Draw the mask for the user
+    ctx.globalCompositeOperation = "destination-out";
     ctx.drawImage(results.segmentationMask, 0, 0, outputCanvas.width, outputCanvas.height);
 
-    // Draw only the user (without background)
-    ctx.globalCompositeOperation = "source-in";
+    // Draw the user on top (without background)
+    ctx.globalCompositeOperation = "source-atop";
     ctx.drawImage(videoElement, 0, 0, outputCanvas.width, outputCanvas.height);
-
-    ctx.restore();
 }
 
 // Start the app
