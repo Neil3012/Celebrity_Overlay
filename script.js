@@ -1,16 +1,16 @@
 const videoElement = document.createElement("video");
+videoElement.setAttribute("playsinline", ""); // Prevents fullscreen pop-up on iOS
 videoElement.width = 640;
 videoElement.height = 480;
 
-// Get the canvas where the final output will be drawn
 const outputCanvas = document.getElementById("outputCanvas");
 const ctx = outputCanvas.getContext("2d");
 
-// Set canvas size to match window
+// Set canvas to match the screen size
 outputCanvas.width = window.innerWidth;
 outputCanvas.height = window.innerHeight;
 
-// Initialize MediaPipe Selfie Segmentation
+// Load MediaPipe Selfie Segmentation
 const selfieSegmentation = new SelfieSegmentation({ locateFile: (file) =>
     `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
 });
@@ -18,31 +18,46 @@ const selfieSegmentation = new SelfieSegmentation({ locateFile: (file) =>
 selfieSegmentation.setOptions({ modelSelection: 1 });
 selfieSegmentation.onResults(processResults);
 
-// Get user camera feed
 async function startCamera() {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    videoElement.srcObject = stream;
-    await videoElement.play();
-    processVideoFrame();
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: "environment", // Opens the back camera
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            }
+        });
+        videoElement.srcObject = stream;
+        await videoElement.play();
+        processVideoFrame();
+    } catch (err) {
+        console.error("Camera access error:", err);
+        alert("Please enable camera permissions in your browser settings.");
+    }
 }
 
-// Process each frame and remove the background
 async function processVideoFrame() {
     await selfieSegmentation.send({ image: videoElement });
     requestAnimationFrame(processVideoFrame);
 }
 
-// Remove background and overlay the user onto the background video
 function processResults(results) {
     ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
 
-    // Draw the segmented person only
+    // Flip the video horizontally (mirror effect)
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.translate(-outputCanvas.width, 0);
+
+    // Draw the segmentation mask
     ctx.globalCompositeOperation = "source-over";
     ctx.drawImage(results.segmentationMask, 0, 0, outputCanvas.width, outputCanvas.height);
 
-    // Draw the original webcam feed only where the person is detected
+    // Draw only the user (without background)
     ctx.globalCompositeOperation = "source-in";
     ctx.drawImage(videoElement, 0, 0, outputCanvas.width, outputCanvas.height);
+
+    ctx.restore();
 }
 
 // Start the app
