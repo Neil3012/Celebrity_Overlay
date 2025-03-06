@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Filter on Camera</title>
+    <title>Video Segmentation with Camera</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
     <style>
         body {
             margin: 0;
@@ -13,13 +14,11 @@
             align-items: center;
             background: black;
         }
-
         #videoContainer {
             position: relative;
             width: 100vw;
             height: 100vh;
         }
-
         video, canvas {
             position: absolute;
             width: 100%;
@@ -30,15 +29,15 @@
 </head>
 <body>
     <div id="videoContainer">
-        <!-- Background Video -->
+        <!-- Background Video (Pre-Recorded Guy in Black) -->
         <video id="bgVideo" autoplay loop muted playsinline>
-            <source src="Option 2.mp4" type="video/mp4">
+            <source src="Demo.MP4" type="video/mp4">
         </video>
 
-        <!-- Camera Feed (Hidden) -->
+        <!-- Camera Feed (Real Person) -->
         <video id="cameraFeed" autoplay playsinline style="display: none;"></video>
 
-        <!-- Canvas for Blending -->
+        <!-- Canvas for AI Processing -->
         <canvas id="outputCanvas"></canvas>
     </div>
 
@@ -48,33 +47,39 @@
         const canvas = document.getElementById("outputCanvas");
         const ctx = canvas.getContext("2d");
 
+        // Initialize AI Segmentation Model
+        const selfieSegmentation = new SelfieSegmentation({locateFile: (file) => 
+            `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+        });
+
+        selfieSegmentation.setOptions({
+            modelSelection: 1, // Use AI for background removal
+        });
+
+        selfieSegmentation.onResults(results => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // Draw Background Video (Guy in Black)
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Get AI-Processed Person from Camera
+            ctx.globalCompositeOperation = "source-atop"; // Keep only the person
+            ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
+            ctx.globalCompositeOperation = "source-over"; // Restore normal blending
+            ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+        });
+
         // Request Camera Access
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }) 
             .then(stream => {
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
-                requestAnimationFrame(updateCanvas);
+                setInterval(() => {
+                    selfieSegmentation.send({ image: cameraFeed });
+                }, 30); // Process every 30ms
             })
             .catch(err => console.error("Error accessing camera: ", err));
-
-        function updateCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-
-            // Draw the Background Video
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Apply Transparency for Blending
-            ctx.globalAlpha = 0.5; // Adjust opacity for filter effect
-
-            // Draw the Camera Feed Over the Background Video
-            ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
-
-            // Reset alpha for next frame
-            ctx.globalAlpha = 1.0;
-
-            requestAnimationFrame(updateCanvas);
-        }
     </script>
 </body>
 </html>
