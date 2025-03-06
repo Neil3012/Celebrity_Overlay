@@ -3,34 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video as Camera Background</title>
+    <title>Video Filter on Camera</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background: black;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            background: black;
         }
 
         #videoContainer {
             position: relative;
             width: 100vw;
             height: 100vh;
-            overflow: hidden;
         }
 
-        #bgVideo, #cameraFeed {
+        video, canvas {
             position: absolute;
             width: 100%;
             height: 100%;
             object-fit: cover;
-        }
-
-        #cameraFeed {
-            transform: scaleX(-1); /* Mirror camera feed for a natural effect */
         }
     </style>
 </head>
@@ -41,24 +35,46 @@
             <source src="Option 2.mp4" type="video/mp4">
         </video>
 
-        <!-- Camera Feed -->
-        <video id="cameraFeed" autoplay playsinline></video>
+        <!-- Camera Feed (Hidden) -->
+        <video id="cameraFeed" autoplay playsinline style="display: none;"></video>
+
+        <!-- Canvas for Blending -->
+        <canvas id="outputCanvas"></canvas>
     </div>
 
     <script>
+        const video = document.getElementById("bgVideo");
         const cameraFeed = document.getElementById("cameraFeed");
+        const canvas = document.getElementById("outputCanvas");
+        const ctx = canvas.getContext("2d");
 
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        // Request Camera Access
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }) 
+            .then(stream => {
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
-            } catch (error) {
-                console.error("Error accessing camera:", error);
-            }
-        }
+                requestAnimationFrame(updateCanvas);
+            })
+            .catch(err => console.error("Error accessing camera: ", err));
 
-        startCamera();
+        function updateCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // Draw the Background Video
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Apply Transparency for Blending
+            ctx.globalAlpha = 0.5; // Adjust opacity for filter effect
+
+            // Draw the Camera Feed Over the Background Video
+            ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+
+            // Reset alpha for next frame
+            ctx.globalAlpha = 1.0;
+
+            requestAnimationFrame(updateCanvas);
+        }
     </script>
 </body>
 </html>
