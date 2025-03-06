@@ -1,0 +1,26 @@
+
+body {
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: black;
+    height: 100vh;
+}
+
+/* Background Video */
+video {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Output Canvas */
+canvas {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    mix-blend-mode: normal;
+}
