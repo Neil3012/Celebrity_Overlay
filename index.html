@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix"></script>
     <title>Video Filter on Camera</title>
     <style>
         body {
@@ -29,52 +31,60 @@
     </style>
 </head>
 <body>
-    <div id="videoContainer">
-        <!-- Background Video -->
-        <video id="bgVideo" autoplay loop muted playsinline>
-            <source src="Option 2.mp4" type="video/mp4">
-        </video>
-
-        <!-- Camera Feed (Hidden) -->
-        <video id="cameraFeed" autoplay playsinline style="display: none;"></video>
-
-        <!-- Canvas for Blending -->
-        <canvas id="outputCanvas"></canvas>
-    </div>
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output"></canvas>
 
     <script>
-        const video = document.getElementById("bgVideo");
-        const cameraFeed = document.getElementById("cameraFeed");
-        const canvas = document.getElementById("outputCanvas");
-        const ctx = canvas.getContext("2d");
-
-        // Request Camera Access
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }) 
-            .then(stream => {
-                cameraFeed.srcObject = stream;
-                cameraFeed.play();
-                requestAnimationFrame(updateCanvas);
-            })
-            .catch(err => console.error("Error accessing camera: ", err));
-
-        function updateCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-
-            // Draw the Background Video
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Apply Transparency for Blending
-            ctx.globalAlpha = 0.5; // Adjust opacity for filter effect
-
-            // Draw the Camera Feed Over the Background Video
-            ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
-
-            // Reset alpha for next frame
-            ctx.globalAlpha = 1.0;
-
-            requestAnimationFrame(updateCanvas);
+        async function setupCamera() {
+            const video = document.getElementById("webcam");
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 640, height: 480 },
+            });
+            video.srcObject = stream;
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    resolve(video);
+                };
+            });
         }
+
+        async function startFilter() {
+            const net = await bodyPix.load();
+            const video = await setupCamera();
+            const canvas = document.getElementById("output");
+            const ctx = canvas.getContext("2d");
+
+            // Set canvas dimensions to match video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const background = new Image();
+            background.src = "background.jpg"; // Ensure this image exists
+            background.onload = () => {
+                renderFrame();
+            };
+
+            async function renderFrame() {
+                const segmentation = await net.segmentPerson(video);
+
+                ctx.drawImage(background, 0, 0, canvas.width, canvas.height); // Draw background
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Draw video feed
+
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const pixels = imageData.data;
+
+                for (let i = 0; i < pixels.length; i += 4) {
+                    if (segmentation.data[i / 4] === 0) {
+                        pixels[i + 3] = 0; // Make background transparent
+                    }
+                }
+
+                ctx.putImageData(imageData, 0, 0);
+                requestAnimationFrame(renderFrame);
+            }
+        }
+
+        startFilter();
     </script>
 </body>
 </html>
