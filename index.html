@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Background with Real-Time Segmentation</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+    <title>Step 1: Load Background Video & Camera Feed</title>
     <style>
         body {
             margin: 0;
@@ -32,15 +31,15 @@
 </head>
 <body>
     <div id="videoContainer">
-        <!-- Background Video (Guy in Black) -->
+        <!-- Background Video -->
         <video id="bgVideo" autoplay loop muted playsinline>
             <source src="Demo.MP4" type="video/mp4">
         </video>
 
-        <!-- Camera Feed (Hidden for Processing) -->
-        <video id="cameraFeed" autoplay playsinline style="display: none;"></video>
+        <!-- Camera Feed (Visible) -->
+        <video id="cameraFeed" autoplay playsinline></video>
 
-        <!-- Canvas for AI Processing -->
+        <!-- Canvas to Combine Background & Camera -->
         <canvas id="outputCanvas"></canvas>
     </div>
 
@@ -50,55 +49,28 @@
         const canvas = document.getElementById("outputCanvas");
         const ctx = canvas.getContext("2d");
 
-        // ✅ Fix: Use async loading to prevent freezing
-        async function startSegmentation() {
-            const selfieSegmentation = new SelfieSegmentation({ locateFile: (file) =>
-                `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
-            });
-
-            selfieSegmentation.setOptions({
-                modelSelection: 1, // Higher accuracy model
-                selfieMode: true
-            });
-
-            await selfieSegmentation.initialize(); // Ensure model loads fully
-
-            // ✅ Fix: Process Frames at a Lower Interval (Avoid Freezing)
-            async function processFrame() {
-                if (cameraFeed.readyState >= 2) {
-                    const results = await selfieSegmentation.send({ image: cameraFeed });
-
-                    canvas.width = window.innerWidth;
-                    canvas.height = window.innerHeight;
-
-                    // Draw Background Video First
-                    ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
-
-                    // Apply AI Mask (Keep only the Real Person)
-                    ctx.globalCompositeOperation = "destination-in";
-                    ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
-
-                    // Draw Camera Feed (Only the Person Appears)
-                    ctx.globalCompositeOperation = "destination-over";
-                    ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
-
-                    // Reset Canvas Blending Mode
-                    ctx.globalCompositeOperation = "source-over";
-                }
-
-                setTimeout(processFrame, 40); // ✅ Fix: Lower Frame Rate to Prevent Freezing
-            }
-
-            processFrame();
-        }
-
-        // ✅ Fix: Ensure Camera Permissions Work on Mobile
+        // ✅ Ensure Camera Starts Properly
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
-                startSegmentation(); // Start AI Processing after camera starts
+
+                // Start drawing on canvas
+                function updateCanvas() {
+                    canvas.width = window.innerWidth;
+                    canvas.height = window.innerHeight;
+
+                    // Draw Background Video
+                    ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
+
+                    // Draw Camera Feed
+                    ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+
+                    requestAnimationFrame(updateCanvas);
+                }
+
+                updateCanvas(); // Start canvas rendering loop
             } catch (error) {
                 console.error("Error accessing camera:", error);
             }
