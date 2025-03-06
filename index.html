@@ -3,83 +3,107 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Segmentation with Camera</title>
+    <title>WebGL Video Segmentation</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: black;
         }
-        #videoContainer {
-            position: relative;
+        #webglCanvas {
+            position: absolute;
             width: 100vw;
             height: 100vh;
-        }
-        video, canvas {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
         }
     </style>
 </head>
 <body>
-    <div id="videoContainer">
-        <!-- Background Video (Pre-Recorded Guy in Black) -->
-        <video id="bgVideo" autoplay loop muted playsinline>
-            <source src="Option 2.mp4" type="video/mp4">
-        </video>
-
-        <!-- Camera Feed (Real Person) -->
-        <video id="cameraFeed" autoplay playsinline style="display: none;"></video>
-
-        <!-- Canvas for AI Processing -->
-        <canvas id="outputCanvas"></canvas>
-    </div>
+    <video id="bgVideo" autoplay loop muted playsinline>
+        <source src="Option 2.mp4" type="video/mp4">
+    </video>
+    <video id="cameraFeed" autoplay playsinline style="display: none;"></video>
+    <canvas id="webglCanvas"></canvas>
 
     <script>
         const video = document.getElementById("bgVideo");
         const cameraFeed = document.getElementById("cameraFeed");
-        const canvas = document.getElementById("outputCanvas");
-        const ctx = canvas.getContext("2d");
+        const canvas = document.getElementById("webglCanvas");
 
-        // Initialize AI Segmentation Model
-        const selfieSegmentation = new SelfieSegmentation({locateFile: (file) => 
-            `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`
+        // WebGL Scene
+        const scene = new THREE.Scene();
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+        camera.position.z = 1;
+
+        // Create Video Textures
+        const bgTexture = new THREE.VideoTexture(video);
+        const cameraTexture = new THREE.VideoTexture(cameraFeed);
+        bgTexture.minFilter = THREE.LinearFilter;
+        cameraTexture.minFilter = THREE.LinearFilter;
+
+        // Create Shader Material for Person Segmentation
+        const personMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                videoTexture: { value: cameraTexture },
+                maskTexture: { value: null }, // Mask from AI
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec2 vUv;
+                uniform sampler2D videoTexture;
+                uniform sampler2D maskTexture;
+                void main() {
+                    vec4 mask = texture2D(maskTexture, vUv);
+                    vec4 color = texture2D(videoTexture, vUv);
+                    gl_FragColor = mix(vec4(0.0, 0.0, 0.0, 0.0), color, mask.r);
+                }
+            `,
+            transparent: true
         });
 
-        selfieSegmentation.setOptions({
-            modelSelection: 1, // Use AI for background removal
-        });
+        // Create Meshes
+        const bgMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: bgTexture }));
+        const personMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), personMaterial);
+
+        scene.add(bgMesh);
+        scene.add(personMesh);
+
+        // Initialize AI Segmentation
+        const selfieSegmentation = new SelfieSegmentation({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}` });
+        selfieSegmentation.setOptions({ modelSelection: 1 });
 
         selfieSegmentation.onResults(results => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-
-            // Draw Background Video (Guy in Black)
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Get AI-Processed Person from Camera
-            ctx.globalCompositeOperation = "source-atop"; // Keep only the person
-            ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
-            ctx.globalCompositeOperation = "source-over"; // Restore normal blending
-            ctx.drawImage(cameraFeed, 0, 0, canvas.width, canvas.height);
+            const maskCanvas = document.createElement("canvas");
+            maskCanvas.width = results.segmentationMask.width;
+            maskCanvas.height = results.segmentationMask.height;
+            const ctx = maskCanvas.getContext("2d");
+            ctx.drawImage(results.segmentationMask, 0, 0);
+            personMaterial.uniforms.maskTexture.value = new THREE.CanvasTexture(maskCanvas);
         });
 
-        // Request Camera Access
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }) 
+        // Get Camera Feed
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
             .then(stream => {
                 cameraFeed.srcObject = stream;
                 cameraFeed.play();
-                setInterval(() => {
-                    selfieSegmentation.send({ image: cameraFeed });
-                }, 30); // Process every 30ms
+                setInterval(() => selfieSegmentation.send({ image: cameraFeed }), 30);
             })
             .catch(err => console.error("Error accessing camera: ", err));
+
+        // Render Loop
+        function render() {
+            requestAnimationFrame(render);
+            renderer.render(scene, camera);
+        }
+        render();
     </script>
 </body>
 </html>
