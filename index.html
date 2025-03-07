@@ -3,62 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video as Camera Background</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: black;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-
-        #videoContainer {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        #bgVideo, #cameraFeed {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        #cameraFeed {
-            transform: scaleX(-1); /* Mirror camera feed for a natural effect */
-        }
-    </style>
+    <title>Web AR Filter</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
 </head>
 <body>
-    <div id="videoContainer">
-        <!-- Background Video -->
-        <video id="bgVideo" autoplay loop muted playsinline>
-            <source src="Demo.MP4" type="video/mp4">
-        </video>
-
-        <!-- Camera Feed -->
-        <video id="cameraFeed" autoplay playsinline></video>
-    </div>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <video id="backgroundVideo" loop autoplay muted>
+        <source src="Option 2.mp4" type="video/mp4">
+    </video>
 
     <script>
-        const cameraFeed = document.getElementById("cameraFeed");
-
         async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                cameraFeed.srcObject = stream;
-                cameraFeed.play();
-            } catch (error) {
-                console.error("Error accessing camera:", error);
-            }
+            const video = document.getElementById('video');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
         }
 
-        startCamera();
+        async function setupSegmentation() {
+            const segmentation = new SelfieSegmentation({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`});
+            segmentation.setOptions({ modelSelection: 1 });
+            await segmentation.initialize();
+            return segmentation;
+        }
+
+        async function runSegmentation() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const bgVideo = document.getElementById('backgroundVideo');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            const segmentation = await setupSegmentation();
+
+            function processFrame() {
+                segmentation.send({ image: video }).then((result) => {
+                    const mask = result.segmentationMask;
+                    ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
+                    ctx.globalCompositeOperation = "destination-atop";
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    ctx.globalCompositeOperation = "source-over";
+                    requestAnimationFrame(processFrame);
+                });
+            }
+            processFrame();
+        }
+
+        startCamera().then(runSegmentation);
     </script>
 </body>
 </html>
