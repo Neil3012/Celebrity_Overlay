@@ -3,25 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web AR Filter</title>
+    <title>Snapchat-Style Video Background</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation"></script>
+    <style>
+        body { margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; background: black; }
+        video, canvas { position: absolute; width: 100vw; height: 100vh; object-fit: cover; }
+        #video { display: none; } /* Hide raw camera feed */
+    </style>
 </head>
 <body>
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
+    <video id="video" autoplay playsinline></video> <!-- Camera Feed -->
     <video id="backgroundVideo" loop autoplay muted>
         <source src="Option 2.mp4" type="video/mp4">
     </video>
+    <canvas id="canvas"></canvas> <!-- Output Canvas -->
 
     <script>
         async function startCamera() {
             const video = document.getElementById('video');
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
             video.srcObject = stream;
+            return new Promise((resolve) => video.onloadedmetadata = resolve);
         }
 
         async function setupSegmentation() {
-            const segmentation = new SelfieSegmentation({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`});
+            const segmentation = new SelfieSegmentation({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}` });
             segmentation.setOptions({ modelSelection: 1 });
             await segmentation.initialize();
             return segmentation;
@@ -33,25 +39,34 @@
             const ctx = canvas.getContext('2d');
             const bgVideo = document.getElementById('backgroundVideo');
 
+            await startCamera();
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
             const segmentation = await setupSegmentation();
 
-            function processFrame() {
+            async function processFrame() {
                 segmentation.send({ image: video }).then((result) => {
                     const mask = result.segmentationMask;
+
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    // Draw background video
                     ctx.drawImage(bgVideo, 0, 0, canvas.width, canvas.height);
+
+                    // Apply segmentation mask (remove background)
                     ctx.globalCompositeOperation = "destination-atop";
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    ctx.globalCompositeOperation = "source-over";
+
+                    ctx.globalCompositeOperation = "source-over"; // Reset blending mode
                     requestAnimationFrame(processFrame);
                 });
             }
+
             processFrame();
         }
 
-        startCamera().then(runSegmentation);
+        runSegmentation();
     </script>
 </body>
 </html>
