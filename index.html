@@ -9,30 +9,14 @@
         body { margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; background: black; }
         video, canvas { position: absolute; width: 100vw; height: 100vh; object-fit: cover; }
         #video { display: none; } /* Hide raw camera feed */
-        #backgroundSelect { position: absolute; top: 10px; left: 10px; padding: 10px; font-size: 16px; }
     </style>
 </head>
 <body>
-    <select id="backgroundSelect">
-        <option value="video">Video</option>
-        <option value="image">Image</option>
-        <option value="color">Solid Color</option>
-    </select>
-    
     <video id="video" autoplay playsinline></video> <!-- Live Camera -->
-    <video id="backgroundVideo" loop autoplay muted>
-        <source src="Option 2.mp4" type="video/mp4">
-    </video>
-    <img id="backgroundImage" src="background.jpg" style="display:none;">
+    <img id="backgroundImage" src="background.jpg" style="display:none;"> <!-- Background Image -->
     <canvas id="canvas"></canvas> <!-- Final Output -->
 
     <script>
-        let selectedBackground = "video";
-
-        document.getElementById('backgroundSelect').addEventListener('change', function() {
-            selectedBackground = this.value;
-        });
-
         async function startCamera() {
             const video = document.getElementById('video');
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
@@ -52,21 +36,15 @@
             const video = document.getElementById('video');
             const canvas = document.getElementById('canvas');
             const ctx = canvas.getContext('2d');
+            const bgImage = document.getElementById('backgroundImage');
 
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Set background based on selection
-            if (selectedBackground === "video") {
-                ctx.drawImage(document.getElementById('backgroundVideo'), 0, 0, canvas.width, canvas.height);
-            } else if (selectedBackground === "image") {
-                ctx.drawImage(document.getElementById('backgroundImage'), 0, 0, canvas.width, canvas.height);
-            } else if (selectedBackground === "color") {
-                ctx.fillStyle = "blue"; // Change color here
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
+            // Draw background image
+            ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
 
             // Apply segmentation mask (remove background)
             ctx.globalCompositeOperation = "destination-atop";
