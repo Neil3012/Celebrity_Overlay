@@ -3,84 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix"></script>
-    <title>Video Filter on Camera</title>
+    <title>Video as Camera Background</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
+            background: black;
             display: flex;
             justify-content: center;
             align-items: center;
-            background: black;
+            height: 100vh;
         }
 
         #videoContainer {
             position: relative;
             width: 100vw;
             height: 100vh;
+            overflow: hidden;
         }
 
-        video, canvas {
+        #bgVideo, #cameraFeed {
             position: absolute;
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
+
+        #cameraFeed {
+            transform: scaleX(-1); /* Mirror camera feed for a natural effect */
+        }
     </style>
 </head>
 <body>
-    <video id="webcam" autoplay playsinline></video>
-    <canvas id="output"></canvas>
+    <div id="videoContainer">
+        <!-- Background Video -->
+        <video id="bgVideo" autoplay loop muted playsinline>
+            <source src="Demo.MP4" type="video/mp4">
+        </video>
+
+        <!-- Camera Feed -->
+        <video id="cameraFeed" autoplay playsinline></video>
+    </div>
 
     <script>
-        async function setupCamera() {
-            const video = document.getElementById("webcam");
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 640, height: 480 },
-            });
-            video.srcObject = stream;
-            return new Promise((resolve) => {
-                video.onloadedmetadata = () => {
-                    resolve(video);
-                };
-            });
-        }
+        const cameraFeed = document.getElementById("cameraFeed");
 
-        async function startFilter() {
-    const net = await bodyPix.load();
-    const video = await setupCamera();
-    const canvas = document.getElementById("output");
-    const ctx = canvas.getContext("2d");
-
-    async function renderFrame() {
-        const segmentation = await net.segmentPerson(video);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // Apply segmentation (make background transparent)
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-        for (let i = 0; i < pixels.length; i += 4) {
-            if (segmentation.data[i / 4] === 0) {
-                pixels[i + 3] = 0; // Make background transparent
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                cameraFeed.srcObject = stream;
+                cameraFeed.play();
+            } catch (error) {
+                console.error("Error accessing camera:", error);
             }
         }
-        ctx.putImageData(imageData, 0, 0);
 
-        // Draw Text on top
-        ctx.font = "20px Arial";
-        ctx.fillStyle = "red";
-        ctx.fillText("Live Camera Feed", 20, 40);
-
-        requestAnimationFrame(renderFrame);
-    }
-
-    renderFrame();
-}
-
-
-        startFilter();
+        startCamera();
     </script>
 </body>
 </html>
