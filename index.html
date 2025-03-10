@@ -92,26 +92,32 @@
 }
 
 
-        async function predictWebcam() {
-            if (!imageSegmenter || !webcamActive) return;
-            
-            ctx.drawImage(backgroundVideo, 0, 0, canvas.width, canvas.height); // Draw background video
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Draw webcam feed
+async function predictWebcam() {
+    if (!imageSegmenter || !webcamActive) return;
 
-            const segmentation = await imageSegmenter.segmentForVideo(video, performance.now());
-            const mask = segmentation.categoryMask.getAsUint8Array();
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const pixels = imageData.data;
+    // Ensure the background video plays continuously
+    if (backgroundVideo.paused) {
+        backgroundVideo.play();
+    }
 
-            for (let i = 0; i < mask.length; i++) {
-                if (mask[i] === 0) { // Background pixels
-                    pixels[i * 4 + 3] = 0; // Make background transparent
-                }
-            }
+    ctx.drawImage(backgroundVideo, 0, 0, canvas.width, canvas.height); // Draw background video
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Draw webcam feed
 
-            ctx.putImageData(imageData, 0, 0);
-            requestAnimationFrame(predictWebcam);
+    const segmentation = await imageSegmenter.segmentForVideo(video, performance.now());
+    const mask = segmentation.categoryMask.getAsUint8Array();
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+
+    for (let i = 0; i < mask.length; i++) {
+        if (mask[i] === 0) { // Background pixels
+            pixels[i * 4 + 3] = 0; // Make background transparent
         }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    requestAnimationFrame(predictWebcam);
+}
+
 
         toggleCamButton.addEventListener("click", async () => {
             if (!webcamActive) {
