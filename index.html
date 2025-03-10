@@ -77,15 +77,20 @@
         }
 
         async function startCamera() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            video.onloadedmetadata = () => {
-                video.play();
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                predictWebcam();
-            };
-        }
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            video.play();
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            predictWebcam();
+        };
+    } catch (error) {
+        console.error("Error accessing the back camera:", error);
+    }
+}
+
 
         async function predictWebcam() {
             if (!imageSegmenter || !webcamActive) return;
