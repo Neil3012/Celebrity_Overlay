@@ -3,37 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blend Video & Camera Feed</title>
+    <title>Video Background Camera Filter</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
             overflow: hidden;
             background: black;
+            margin: 0;
         }
         #container {
             position: relative;
             width: 100vw;
             height: 100vh;
         }
-        #backgroundVideo {
+        video, canvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
-            z-index: -1; /* Keeps video in background */
-        }
-        #canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            mix-blend-mode: lighten; /* Blends the foreground nicely */
         }
         #webcam {
             display: none; /* Hide raw webcam */
@@ -43,23 +35,27 @@
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 24px;
-            font-size: 18px;
+            padding: 10px 20px;
+            font-size: 16px;
             cursor: pointer;
-            background: rgba(255, 255, 255, 0.8);
+            background-color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
 
     <div id="container">
-        <video id="backgroundVideo" loop autoplay>
+        <!-- Background Video -->
+        <video id="backgroundVideo" loop autoplay muted>
             <source src="Option 2.mp4" type="video/mp4">
         </video>
+        <!-- Hidden Webcam Feed -->
         <video id="webcam" autoplay playsinline></video>
+        <!-- Canvas for Processed Video -->
         <canvas id="canvas"></canvas>
+        <!-- Button to Start/Stop Camera -->
         <button id="toggleCam">Start Camera</button>
     </div>
 
@@ -89,18 +85,14 @@
             });
         }
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
                     video.play();
-                    resizeCanvas();
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
                     predictWebcam();
                 };
             } catch (error) {
@@ -115,18 +107,25 @@
                 backgroundVideo.play();
             }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous frame
+            ctx.drawImage(backgroundVideo, 0, 0, canvas.width, canvas.height); // Draw background video
+
+            // Apply 10% zoom (Scale by 1.1x)
+            const zoomFactor = 1.1; 
+            const zoomWidth = canvas.width * zoomFactor;
+            const zoomHeight = canvas.height * zoomFactor;
+            const offsetX = (canvas.width - zoomWidth) / 2; // Center horizontally
+            const offsetY = (canvas.height - zoomHeight) / 2; // Center vertically
+
+            ctx.drawImage(video, offsetX, offsetY, zoomWidth, zoomHeight); // Draw zoomed-in webcam feed
 
             const segmentation = await imageSegmenter.segmentForVideo(video, performance.now());
             const mask = segmentation.categoryMask.getAsUint8Array();
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // Draw webcam feed
-
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const pixels = imageData.data;
 
             for (let i = 0; i < mask.length; i++) {
                 if (mask[i] === 0) { 
-                    pixels[i * 4 + 3] = 120; // Adjust transparency for blending
+                    pixels[i * 4 + 3] = 0; // Make background transparent
                 }
             }
 
@@ -146,8 +145,6 @@
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
         });
-
-        window.addEventListener("resize", resizeCanvas);
     </script>
 
 </body>
