@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Full-Screen Background Video with Camera Foreground</title>
+    <title>Blend Video & Camera Feed</title>
     <style>
         body, html {
             margin: 0;
@@ -25,7 +25,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            z-index: -1; /* Sends background video to the back */
+            z-index: -1; /* Keeps video in background */
         }
         #canvas {
             position: absolute;
@@ -33,6 +33,7 @@
             left: 0;
             width: 100vw;
             height: 100vh;
+            mix-blend-mode: lighten; /* Blends the foreground nicely */
         }
         #webcam {
             display: none; /* Hide raw webcam */
@@ -124,8 +125,8 @@
             const pixels = imageData.data;
 
             for (let i = 0; i < mask.length; i++) {
-                if (mask[i] === 0) { // Background pixels
-                    pixels[i * 4 + 3] = 0; // Make background transparent
+                if (mask[i] === 0) { 
+                    pixels[i * 4 + 3] = 120; // Adjust transparency for blending
                 }
             }
 
